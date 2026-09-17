@@ -1,0 +1,38 @@
+{
+  "indexes": [
+    { "collectionGroup": "uploads", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "visibility", "order": "ASCENDING" },
+      { "fieldPath": "uploadedAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "uploads", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "userId", "order": "ASCENDING" },
+      { "fieldPath": "uploadedAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "earnings", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "userId", "order": "ASCENDING" },
+      { "fieldPath": "type", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "earnings", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "userId", "order": "ASCENDING" },
+      { "fieldPath": "type", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "referrals", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "referrerId", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "referrals", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "joinedAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "withdrawals", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "userId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "withdrawals", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]}
+  ],
+  "fieldOverrides": []
+}

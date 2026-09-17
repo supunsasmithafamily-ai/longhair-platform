@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isAdmin() { return isSignedIn() && request.auth.token.admin == true; }
+
+    // Users can read/create their own profile and edit only non-financial,
+    // non-privilege fields on it. totalEarnings, totalSalesUSD, creatorVerified
+    // and role are only ever changed by Cloud Functions (admin SDK bypasses
+    // rules entirely), never directly by a client write.
+    match /users/{uid} {
+      allow read: if true;
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['totalEarnings','totalSalesUSD','creatorVerified','role']);
+      allow write: if isAdmin();
+    }
+
+    // Uploads: owner can create/read/edit their own metadata (not adViews,
+    // which only logAdView/distributeAdRevenue touch), everyone can read.
+    match /uploads/{id} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.adViews == 0;
+      allow update: if (isOwner(resource.data.userId) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['adViews','userId'])) || isAdmin();
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    // Earnings ledger: read-only for the owner, never client-writable.
+    // Only Cloud Functions (admin SDK) create these.
+    match /earnings/{id} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Purchases: read-only for buyer/seller; only capturePayPalOrder creates these.
+    match /purchases/{id} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    match /paypalCaptures/{id} {
+      allow read, write: if false; // internal ledger, Cloud Functions only
+    }
+
+    // Referrals: the referred signup event may be created client-side (it's
+    // just a record of "X referred Y", not money) — but status/bonus only
+    // change via approveReferral/rejectReferral.
+    match /referrals/{id} {
+      allow read: if isSignedIn() && (resource.data.referrerId == request.auth.uid || resource.data.referredUserId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.referredUserId == request.auth.uid && request.resource.data.status == 'pending';
+      allow update: if isAdmin();
+    }
+
+    match /adRevenuePeriods/{id} {
+      allow read: if true;
+      allow write: if false; // only distributeAdRevenue writes these
+    }
+
+    match /adViewLog/{id} {
+      allow read: if isAdmin();
+      allow write: if false; // only logAdView writes these
+    }
+
+    // Withdrawals: user can create/read their own requests; status only
+    // changes via markWithdrawalPaid/rejectWithdrawal.
+    match /withdrawals/{id} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.status == 'pending';
+      allow update: if isAdmin();
+    }
+  }
+}

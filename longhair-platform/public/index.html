@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+  <meta name="kadam-verification" content="kadam9cf342879cfb0ffbc6d66000ff72839d" />
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Long Hair Earn — Upload + Private + Referrals + Ads + Withdraw (Firebase + reCAPTCHA)</title>
+
+<style>
+  :root{--brand:#8b4513;--brand2:#d2691e;--accent:#ffcc00;--bg:#f8fafc;--ink:#0f172a;--ok:#10b981;--bad:#ef4444;--muted:#64748b}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Arial;background:var(--bg);color:#111}
+  a{color:inherit;text-decoration:none}
+  .nav{position:sticky;top:0;z-index:40;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:10px 14px;display:flex;gap:10px;align-items:center}
+  .nav h1{margin:0;font-size:18px;font-weight:800}
+  .nav .sp{flex:1}
+  .tab{border:0;background:transparent;color:#fff;opacity:.9;padding:8px 10px;border-radius:999px;cursor:pointer}
+  .tab.act{background:rgba(255,255,255,.15);opacity:1}
+  .btn{border:0;border-radius:999px;padding:10px 16px;font-weight:700;cursor:pointer}
+  .btn.primary{background:var(--accent);color:#111}
+  .btn.light{background:#fff;color:#111;border:2px solid #fff}
+  .wrap{max-width:1100px;margin:18px auto;padding:0 14px}
+  .card{background:#fff;border-radius:16px;box-shadow:0 8px 22px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
+  .title{font-size:22px;font-weight:800;color:var(--brand);margin:2px 0 12px}
+  .muted{color:var(--muted)} .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .grid{display:grid;gap:14px}
+  .grid-2{grid-template-columns:1.2fr .8fr}
+  .field{display:grid;gap:6px;margin-bottom:10px}
+  input,select,textarea{border:1px solid #e5e7eb;border-radius:10px;padding:11px 12px;font:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand2);box-shadow:0 0 0 3px rgba(210,105,30,.22)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pill{display:inline-flex;gap:8px;align-items:center;background:#f1f5f9;border-radius:999px;padding:6px 12px}
+  .gallery{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+  .tile{border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fff}
+  .tile .thumb{aspect-ratio:16/9;background:#f3f4f6;display:grid;place-items:center;font-size:12px;color:#6b7280}
+  .tile .meta{padding:10px 12px}
+  .badge{font-size:12px;border-radius:999px;padding:3px 8px;background:#eef2ff;color:#3730a3;font-weight:700}
+  .badge.ok{background:#ecfdf5;color:#065f46}
+  .badge.warn{background:#fff7ed;color:#9a3412}
+  .ad-slot{min-height:90px;border:2px dashed #e5e7eb;border-radius:12px;display:grid;place-items:center}
+  .hide{display:none!important}
+  .toast{position:fixed;right:16px;top:16px;display:grid;gap:8px;z-index:60}
+  .toast .t{background:#fff;border-left:6px solid var(--brand2);padding:10px 12px;border-radius:12px;box-shadow:0 10px 24px rgba(0,0,0,.12)}
+
+  /* Login slideshow */
+  #loginScreen{display:none;position:fixed;inset:0;z-index:999;overflow:hidden}
+  .bg-slides{position:absolute;inset:0}
+  .bg-slides img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.6s ease}
+  .bg-slides img.active{opacity:1}
+  .overlayBox{position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center}
+  .loginBox{background:rgba(255,255,255,0.92);backdrop-filter:blur(4px);padding:28px;border-radius:20px;max-width:380px;width:90%;text-align:center}
+
+  /* Player modal + ad overlay */
+  #playerModal{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:70}
+  .playerWrap{background:#000;border-radius:12px;max-width:920px;width:94%;padding:10px;position:relative}
+  #midAd{position:absolute;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;color:#fff;z-index:80}
+</style>
+
+<!-- Firebase compat (no module build to work in Blogger) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-storage-compat.js"></script>
+
+<!-- PayPal (replace client-id) -->
+<script src="https://www.paypal.com/sdk/js?client-id=PAYPAL_CLIENT_ID_HERE&currency=USD" data-sdk-integration-source="button-factory"></script>
+
+<!-- Google reCAPTCHA (supports v2 invisible on buttons) -->
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+<!-- Firebase Functions (calls the secure backend) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-functions-compat.js"></script>
+</head>
+<body>
+
+<!-- LOGIN PAGE (4-image slideshow + reCAPTCHA button) -->
+<div id="loginScreen">
+  <div class="bg-slides">
+    <!-- Replace image URLs if you want -->
+    <img src="https://i.ibb.co/3msxcJHq/eb9b0927b04e.jpg" class="slide active" alt="">
+    <img src="https://i.ibb.co/Wpn9S5TL/716d716db4b4.jpg" class="slide" alt="">
+    <img src="https://i.ibb.co/xtXLK3rG/83dec70fb575.jpg" class="slide" alt="">
+    <img src="https://i.ibb.co/Nd7CyPv3/4ba7dde7c8ca.jpg" class="slide" alt="">
+<img src="https://i.ibb.co/LXRPMRDT/8770e9b357c2.jpg" class="slide" alt="">
+<img src="https://i.ibb.co/spBhr744/369de2a01bc2.jpg" class="slide" alt="">
+<img src="" class="slide" alt="">    
+  </div>
+  <div class="overlayBox">
+    <div class="loginBox">
+      <h2 style="color:#8b4513;margin:0 0 8px">Login to Long Hair Earn</h2>
+      <p id="loginRefInfo" class="muted" style="margin:0 0 12px"></p>
+      <input id="liEmail" type="email" placeholder="Email" style="width:100%;padding:12px;margin:8px 0;border-radius:10px;border:1px solid #ddd">
+      <input id="liPass" type="password" placeholder="Password" style="width:100%;padding:12px;margin:8px 0;border-radius:10px;border:1px solid #ddd">
+
+      <!-- reCAPTCHA (Login) -->
+      <button
+        id="loginCaptchaBtn"
+        class="g-recaptcha btn primary"
+        data-sitekey="6Lf9_e4rAAAAACVfdICRLPHU6gURot5r8g9h4YDn"
+        data-callback="onLoginCaptcha"
+        data-action="login"
+        data-size="invisible"
+        style="width:100%">Login / ඇතුල්වන්න</button>
+
+      <p style="margin:12px 0 0;font-size:13px">නව සභ්‍යයෙක්ද? <a href="#" id="goRegister" style="color:#8b4513;font-weight:700">Register</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <h1>💇🏽‍♀️ Long Hair Earn</h1>
+  <button class="tab act" data-tab="explore">Explore</button>
+  <button class="tab" data-tab="private">Private</button>
+  <button class="tab" data-tab="upload">Upload</button>
+  <button class="tab" data-tab="ref">Referrals</button>
+  <button class="tab" data-tab="earn">Earnings</button>
+  <button class="tab" data-tab="withdraw">Withdraw</button>
+  <div class="sp"></div>
+  <div class="pill" id="authPill" style="display:none"></div>
+  <button class="btn light" id="openLogin">Login</button>
+  <button class="btn primary" id="openRegister">Register</button>
+</div>
+
+<div class="wrap">
+  <!-- HERO + top ad -->
+  <div class="card">
+    <div class="row">
+      <div>
+        <div class="title">Monetize Your Long Hair Content</div>
+        <p class="muted">Normal uploads — සියලු දෙනාට. Private uploads — paywall unlock. Referrals & Kadam ads ද කොටස්.</p>
+      </div>
+      <div class="sp"></div>
+      <div class="ad-slot" id="adTop">Kadam Banner Slot</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div id="tab-explore" class="tabpane">
+    <div class="card">
+      <div class="title">Public Wall — Normal Uploads</div>
+      <div class="gallery" id="publicWall"></div>
+    </div>
+  </div>
+
+  <div id="tab-private" class="tabpane hide">
+    <div class="card">
+      <div class="title">Private Wall — Pay to Unlock</div>
+      <div class="gallery" id="privateWall"></div>
+    </div>
+    <!-- paywall -->
+    <div class="card hide" id="paywall">
+      <div class="title">Unlock Private Content</div>
+      <div class="row">
+        <div class="pill">Item: <span id="pwTitle" class="mono"></span></div>
+        <div class="pill">Price: $<b id="pwPrice">1.99</b></div>
+      </div>
+      <div id="paypalButtons" style="margin-top:10px"></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="closePaywall">Close</button></div>
+    </div>
+  </div>
+
+  <div id="tab-upload" class="tabpane hide">
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="title">Upload Content</div>
+        <div class="field"><label>Title</label><input id="uTitle" placeholder="e.g., Hair Care Routine"/></div>
+        <div class="field"><label>Type</label>
+          <select id="uVisibility">
+            <option value="public">Normal (Public Wall)</option>
+            <option value="private">Private (Paywall)</option>
+          </select>
+        </div>
+        <div class="field privatePrice hide"><label>Private Price (USD)</label><input id="uPrice" type="number" step="0.01" placeholder="1.99"/></div>
+        <div class="field"><label>Choose File</label><input id="uFile" type="file" accept="image/*,video/*"/></div>
+        <div class="row">
+          <button class="btn primary" id="doUpload">Upload</button>
+          <span class="muted">Bonus: Photo Rs.500 / Video Rs.1000 | Private sales extra (USD)</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="title">Creator Mode</div>
+        <p class="muted">“Private Creator” ලෙස verify වුණාම private uploads දාන්න පුළුවන්.</p>
+        <div id="creatorStatus" class="pill">Status: <b id="creatorFlag">unknown</b></div>
+        <div id="upgradeBox" class="hide" style="margin-top:10px">
+          <div class="pill">Upgrade fee $4.99 (one-time)</div>
+          <div id="paypalUpgrade" style="margin-top:10px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">My Recent Uploads</div>
+      <div class="gallery" id="myUploads"></div>
+    </div>
+
+    <!-- Inline REGISTER (with reCAPTCHA) -->
+    <div class="card" id="authBoxes">
+      <div class="title">Login / Register</div>
+      <div class="row" style="flex-wrap:wrap">
+        <div style="min-width:260px">
+          <div class="field"><label>Email</label><input id="reEmail"></div>
+          <div class="field"><label>Password</label><input id="rePass" type="password"></div>
+          <div class="field"><label>Full Name</label><input id="reName"></div>
+          <div class="field"><label>Account Type</label>
+            <select id="reType"><option value="normal">Normal</option><option value="creator">Private Creator</option></select>
+          </div>
+          <label class="row" style="font-size:13px"><input id="agree" type="checkbox"> I agree to Private Creator rules (if chosen)</label>
+
+          <!-- reCAPTCHA (Register) -->
+          <button
+            id="registerCaptchaBtn"
+            class="g-recaptcha btn primary"
+            data-sitekey="6Lf9_e4rAAAAACVfdICRLPHU6gURot5r8g9h4YDn"
+            data-callback="onRegisterCaptcha"
+            data-action="register"
+            data-size="invisible">Register</button>
+
+          <button class="btn" id="openLogin2" style="margin-left:8px">I have an account</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-ref" class="tabpane hide">
+    <div class="card">
+      <div class="title">Refer & Earn</div>
+      <div class="row">
+        <div class="pill">Your Link:</div>
+        <div class="pill mono" id="myRef">Waiting…</div>
+        <button class="btn" id="copyRef">Copy</button>
+        <button class="btn" id="openKadam">Open Kadam Profile</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div class="pill">Per Referral: <b>Rs. 750</b></div>
+        <div class="pill">Total Referrals: <b id="refCount">0</b></div>
+        <div class="pill">Referral Earnings: Rs. <b id="refEarn">0</b></div>
+      </div>
+      <p class="muted">Register වෙද්දී URL එකේ <code>?ref=CODE</code> තිබුණොත් auto-save වෙයි.</p>
+    </div>
+  </div>
+
+  <div id="tab-earn" class="tabpane hide">
+    <div class="card">
+      <div class="title">Earnings Overview</div>
+      <div class="row">
+        <div class="pill">Uploads Rs: <b id="eUp">0</b></div>
+        <div class="pill">Private Sales $: <b id="eSales">0</b></div>
+        <div class="pill">Referrals Rs: <b id="eRef">0</b></div>
+        <div class="pill">Total: <b id="eTotal">0</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-withdraw" class="tabpane hide">
+    <div class="card">
+      <div class="title">Withdraw</div>
+      <div class="field"><label>Method</label>
+        <select id="wMethod">
+          <option value="paypal">PayPal</option>
+          <option value="oxapay">Crypto (oxapay)</option>
+        </select>
+      </div>
+      <div class="field" id="wPaypalField"><label>PayPal Email</label><input id="wEmail" type="email" placeholder="you@paypal.com"/></div>
+      <div class="field hide" id="wCryptoField"><label>Crypto Wallet Address</label><input id="wWallet" placeholder="wallet address"/></div>
+      <div class="field"><label>Amount (USD)</label><input id="wAmount" type="number" step="0.01" placeholder="10.00"/></div>
+      <div class="row"><button class="btn primary" id="doWithdraw">Request Withdraw</button></div>
+      <p class="muted">Request “pending” ලෙස save වෙයි — ඔබට පෙන්නෙන balance එක confirmed earnings වලින් විතරයි ගණනය වෙන්නේ. Admin manual transfer කරලා “paid” කරන්නේ.</p>
+    </div>
+    <div class="card">
+      <div class="title">My Withdraw Requests</div>
+      <div id="wList"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toasts"></div>
+  <div class="ad-slot" id="adBottom">Kadam Footer Slot</div>
+</div>
+
+<!-- PLAYER MODAL (with mid-roll ad overlay) -->
+<div id="playerModal">
+  <div class="playerWrap">
+    <video id="player" controls playsinline style="width:100%;max-height:70vh;background:#000"></video>
+    <div id="midAd">
+      <div>
+        <div style="text-align:center;margin-bottom:8px">Advertisement</div>
+        <div id="kadamMid"></div>
+        <div style="text-align:center;margin-top:10px"><button class="btn" id="closeAd">Skip Ad</button></div>
+      </div>
+    </div>
+    <div class="row" style="justify-content:flex-end;margin-top:8px">
+      <button class="btn" id="closePlayer">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ====== CONFIG (Firebase + Kadam) ====== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCh6TdiUNk1fwbZhqUyUPhES9cA0Xe1Avg",
+  authDomain: "studio-2796008461-e6419.firebaseapp.com",
+  projectId: "studio-2796008461-e6419",
+  storageBucket: "studio-2796008461-e6419.firebasestorage.app",
+  messagingSenderId: "861128696739",
+  appId: "1:861128696739:web:7d1369092fa27348c17016"
+};
+const KADAM_ZONE_ID = "YOUR_ZONE_ID"; // <-- replace when ready
+const RICHADS_ZONE_ID = "YOUR_RICHADS_ZONE_ID"; // <-- replace when ready
+const HILLTOP_ZONE_ID = "YOUR_HILLTOP_ZONE_ID"; // <-- replace when ready
+/* ====================================== */
+
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth(), db=firebase.firestore(), storage=firebase.storage();
+const functions=firebase.functions();
+
+/* Every ad actually shown gets logged server-side against the upload owner.
+   Admin later enters the real revenue for a period in /admin.html and the
+   backend splits it across creators based on these logged views — nobody's
+   balance moves until the admin confirms real money came in. */
+async function logAdView(uploadId){
+  if(!uploadId) return;
+  try{ await functions.httpsCallable('logAdView')({ uploadId }); }catch(e){ /* non-fatal */ }
+}
+
+const $=q=>document.querySelector(q), $$=q=>document.querySelectorAll(q);
+const toastBox=$('#toasts'); function toast(m){const t=document.createElement('div');t.className='t';t.innerHTML=m;toastBox.appendChild(t);setTimeout(()=>t.remove(),3500)}
+
+/* Kadam banners */
+(function(){
+  if(!KADAM_ZONE_ID||KADAM_ZONE_ID==="YOUR_ZONE_ID"){ $('#adTop').textContent="Add Kadam ZONE_ID"; $('#adBottom').textContent="Add Kadam ZONE_ID"; return; }
+  const s=document.createElement('script'); s.async=true;
+  s.src="https://jsc.adskeeper.co.uk/k/a/kadam.net."+KADAM_ZONE_ID+".js";
+  document.body.appendChild(s);
+})();
+
+/* RichAds banner (fill in your own tag from the RichAds dashboard —
+   the exact <script> snippet they give you when you create a zone) */
+(function(){
+  if(!RICHADS_ZONE_ID||RICHADS_ZONE_ID==="YOUR_RICHADS_ZONE_ID") return;
+  const s=document.createElement('script'); s.async=true; s.dataset.zone=RICHADS_ZONE_ID;
+  s.src="https://richads.example/tag.js"; // <-- replace with the real RichAds snippet URL for your zone
+  document.body.appendChild(s);
+})();
+
+/* HilltopAds banner (fill in your own tag from the HilltopAds dashboard) */
+(function(){
+  if(!HILLTOP_ZONE_ID||HILLTOP_ZONE_ID==="YOUR_HILLTOP_ZONE_ID") return;
+  const s=document.createElement('script'); s.async=true; s.dataset.zone=HILLTOP_ZONE_ID;
+  s.src="https://hilltopads.example/tag.js"; // <-- replace with the real HilltopAds snippet URL for your zone
+  document.body.appendChild(s);
+})();
+
+/* Tabs */
+$$('.tab').forEach(b=>b.onclick=()=>{ $$('.tab').forEach(x=>x.classList.remove('act')); b.classList.add('act'); const name=b.dataset.tab; $$('.tabpane').forEach(p=>p.classList.add('hide')); $('#tab-'+name).classList.remove('hide'); });
+
+/* Login slideshow + referral auto-open */
+(function(){
+  const slides=$$('.bg-slides .slide'); let i=0;
+  setInterval(()=>{slides[i].classList.remove('active'); i=(i+1)%slides.length; slides[i].classList.add('active');},4500);
+  const ref=new URLSearchParams(location.search).get('ref');
+  if(ref){ localStorage.setItem('incoming_ref',ref); $('#loginScreen').style.display='block'; $('#loginRefInfo').innerHTML=`Referral code: <b>${ref}</b>`; }
+})();
+$('#openLogin').onclick=()=>$('#loginScreen').style.display='block';
+$('#goRegister').onclick=()=>{ $('#loginScreen').style.display='none'; openRegisterBox(); };
+
+/* Auth pill */
+function setAuthPill(u){
+  const pill=$('#authPill');
+  if(u){ pill.style.display='inline-flex'; pill.innerHTML=`👤 <b style="margin-left:6px">${u.email}</b> <button class="btn light" id="logoutBtn">Logout</button>`; $('#logoutBtn').onclick=()=>auth.signOut(); $('#openLogin').classList.add('hide'); $('#openRegister').classList.add('hide'); }
+  else { pill.style.display='none'; $('#openLogin').classList.remove('hide'); $('#openRegister').classList.remove('hide'); }
+}
+auth.onAuthStateChanged(async u=>{ setAuthPill(u); loadPublic(); loadPrivate(); if(u){ setupMe(u); loadMine(u); loadEarnings(u); loadWithdraws(u); } });
+
+$('#openRegister').onclick=openRegisterBox;
+function openRegisterBox(){
+  toast(`<b>Register</b> panel Upload tab එකේ පෙන්වෙනවා.`);
+  $$('.tab').forEach(x=>x.classList.remove('act')); document.querySelector('.tab[data-tab="upload"]').classList.add('act'); $$('.tabpane').forEach(p=>p.classList.add('hide')); $('#tab-upload').classList.remove('hide');
+}
+$('#openLogin2').onclick=()=>$('#loginScreen').style.display='block';
+
+/* ===== reCAPTCHA callbacks ===== */
+async function onLoginCaptcha(token){ // called by reCAPTCHA button on login screen
+  try{
+    const email=$('#liEmail').value.trim(), pass=$('#liPass').value;
+    const {user}=await auth.signInWithEmailAndPassword(email,pass);
+    await ensureUserDoc(user); $('#loginScreen').style.display='none'; toast('Welcome back!');
+  }catch(e){ toast(e.message); }
+}
+async function onRegisterCaptcha(token){ // called by reCAPTCHA button in register box
+  try{
+    const email=$('#reEmail').value.trim(), pass=$('#rePass').value, name=$('#reName').value.trim();
+    const role=$('#reType').value, agree=$('#agree').checked;
+    if(!email||!pass){toast('Email & password required');return;}
+    if(role==='creator'&&!agree){toast('Agree to rules');return;}
+    const {user}=await auth.createUserWithEmailAndPassword(email,pass);
+    await ensureUserDoc(user,{name,role,agree}); $('#loginScreen').style.display='none'; toast('Registered ✔');
+  }catch(e){ toast(e.message); }
+}
+/* expose globally for reCAPTCHA */
+window.onLoginCaptcha=onLoginCaptcha;
+window.onRegisterCaptcha=onRegisterCaptcha;
+
+/* ===== Core helpers ===== */
+async function ensureUserDoc(u, extra={}){
+  const ref=db.collection('users').doc(u.uid); const snap=await ref.get();
+  if(!snap.exists){
+    const referralCode=('YNS'+u.uid.slice(-6)).toUpperCase();
+    const referredBy=localStorage.getItem('incoming_ref')||null;
+    await ref.set({
+      uid:u.uid,name:extra.name||'',email:u.email,
+      referralCode,referredBy,role:extra.role||'normal',
+      creatorVerified: extra.role==='creator' ? !!extra.agree : false,
+      totalEarnings:0,totalSalesUSD:0,joinedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    if(referredBy){
+      const find=await db.collection('users').where('referralCode','==',referredBy).limit(1).get();
+      if(!find.empty){
+        const referrer=find.docs[0];
+        // Just records that the referral happened. No money moves yet —
+        // an admin reviews it in /admin.html (checking it's a real,
+        // distinct signup, not a self-referral or bot) and only then
+        // calls approveReferral, which is what actually credits earnings.
+        await db.collection('referrals').add({referrerId:referrer.id,referredUserId:u.uid,bonusAmount:750,status:'pending',joinedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      }
+      localStorage.removeItem('incoming_ref');
+    }
+  }
+}
+
+/* ===== Public/Private walls ===== */
+async function loadPublic(){
+  const wall=$('#publicWall'); wall.innerHTML='';
+  const snap=await db.collection('uploads').where('visibility','==','public').orderBy('uploadedAt','desc').limit(60).get();
+  snap.forEach(d=>{ const x=d.data(); const isV=(x.fileType||'').startsWith('video/');
+    wall.insertAdjacentHTML('beforeend',`
+      <div class="tile">
+        <div class="thumb">${isV?'Video':'Image'}</div>
+        <div class="meta">
+          <div><b>${x.title||'Untitled'}</b> <span class="badge ok">Public</span></div>
+          <div class="row" style="margin-top:6px">
+            <button class="btn" onclick="openPlayer('${x.fileUrl}','${x.fileType||''}','${d.id}')">Open</button>
+          </div>
+        </div>
+      </div>`); });
+}
+async function loadPrivate(){
+  const wall=$('#privateWall'); wall.innerHTML='';
+  const snap=await db.collection('uploads').where('visibility','==','private').orderBy('uploadedAt','desc').limit(60).get();
+  snap.forEach(doc=>{ const x=doc.data(); const id=doc.id; const isV=(x.fileType||'').startsWith('video/');
+    wall.insertAdjacentHTML('beforeend',`
+      <div class="tile">
+        <div class="thumb">${isV?'Private Video':'Private Image'}</div>
+        <div class="meta">
+          <div><b>${x.title||'Untitled'}</b> <span class="badge warn">Private</span></div>
+          <div class="row" style="margin-top:6px">
+            <div class="pill">Price: $<b>${Number(x.priceUSD||1.99).toFixed(2)}</b></div>
+            <button class="btn" onclick="viewPrivate('${id}','${x.title||''}',${Number(x.priceUSD||1.99)})">View</button>
+          </div>
+        </div>
+      </div>`); });
+}
+
+/* ===== Paywall ===== */
+let currentItem=null;
+async function viewPrivate(id,title,price){
+  const u=auth.currentUser; if(!u){toast('Login first'); return;}
+  const bought=await db.collection('purchases').where('userId','==',u.uid).where('uploadId','==',id).limit(1).get();
+  if(!bought.empty){ const doc=await db.collection('uploads').doc(id).get(); const url=doc.data().fileUrl, type=doc.data().fileType||''; openPlayer(url,type,id); return; }
+  currentItem={id,title,price}; $('#pwTitle').textContent=title; $('#pwPrice').textContent=price.toFixed(2); $('#paywall').classList.remove('hide');
+  $('#paypalButtons').innerHTML='';
+  paypal.Buttons({
+    // We only *create* the order client-side. Capture + the resulting
+    // purchase/earnings records happen in the capturePayPalOrder Cloud
+    // Function, which re-checks the amount with PayPal's API — a user
+    // can't just call db.collection('purchases').add(...) from devtools
+    // and grant themselves free content or fake a creator's earnings.
+    createOrder:(d,a)=>a.order.create({purchase_units:[{amount:{value:price.toFixed(2)}}]}),
+    onApprove:async(d)=>{
+      try{
+        await functions.httpsCallable('capturePayPalOrder')({ orderID:d.orderID, kind:'private_sale', uploadId:id });
+        const up=await db.collection('uploads').doc(id).get();
+        toast('Payment successful'); $('#paywall').classList.add('hide'); openPlayer(up.data().fileUrl, up.data().fileType||'', id);
+      }catch(e){ toast('Payment could not be verified: '+e.message); }
+    }
+  }).render('#paypalButtons');
+}
+$('#closePaywall').onclick=()=>$('#paywall').classList.add('hide');
+
+/* ===== Uploading ===== */
+$('#uVisibility').onchange=()=>{ if($('#uVisibility').value==='private'){$('.privatePrice').classList.remove('hide');} else {$('.privatePrice').classList.add('hide');} };
+$('#doUpload').onclick=async()=>{
+  const u=auth.currentUser; if(!u){toast('Login first'); return;}
+  const f=$('#uFile').files[0]; if(!f){toast('Choose a file');return;}
+  const vis=$('#uVisibility').value; const title=$('#uTitle').value.trim()||f.name; const isVideo=f.type.startsWith('video/');
+  if(vis==='private'){ const me=await db.collection('users').doc(u.uid).get(); if(!(me.data().creatorVerified)){ toast('Verify as Private Creator first'); return; } }
+  try{
+    const path=`uploads/${u.uid}/${Date.now()}_${f.name}`; const task=await storage.ref(path).put(f); const url=await task.ref.getDownloadURL();
+    const price=vis==='private'?Number($('#uPrice').value||1.99):0;
+    // No instant "bonus" here — that money would have to come from
+    // somewhere. Earnings for this upload accrue only from (a) real
+    // private-content sales, captured server-side, and (b) this
+    // upload's share of ad revenue the admin actually confirms.
+    await db.collection('uploads').add({userId:u.uid,title,fileUrl:url,fileType:f.type,visibility:vis,priceUSD:price,views:0,likes:0,adViews:0,uploadedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    toast(`Uploaded (${vis}) ✔`); $('#uFile').value=''; $('#uTitle').value=''; loadPublic(); loadPrivate(); loadMine(u); loadEarnings(u);
+  }catch(e){ toast(e.message); }
+};
+
+/* ===== Me / referral / upgrade ===== */
+async function setupMe(u){
+  const me=await db.collection('users').doc(u.uid).get(); const d=me.data()||{};
+  $('#creatorFlag').textContent=d.creatorVerified?'Verified Creator':'Normal Member';
+  if(!d.creatorVerified){ $('#upgradeBox').classList.remove('hide'); $('#paypalUpgrade').innerHTML='';
+    paypal.Buttons({
+      createOrder:(d,a)=>a.order.create({purchase_units:[{amount:{value:'4.99'}}]}),
+      onApprove:async(d)=>{
+        try{
+          await functions.httpsCallable('capturePayPalOrder')({ orderID:d.orderID, kind:'creator_upgrade' });
+          toast('Creator verified ✔'); setupMe(u);
+        }catch(e){ toast('Payment could not be verified: '+e.message); }
+      }
+    }).render('#paypalUpgrade');
+  } else { $('#upgradeBox').classList.add('hide'); }
+  const code=d.referralCode||('YNS'+u.uid.slice(-6)).toUpperCase();
+  const base=location.origin+location.pathname; const link=`${base}?ref=${encodeURIComponent(code)}`; $('#myRef').textContent=link; $('#copyRef').onclick=()=>navigator.clipboard.writeText(link).then(()=>toast('Copied'));
+  $('#openKadam').onclick=()=>window.open('https://pub.kadam.net/profile','_blank');
+}
+async function loadMine(u){
+  const g=$('#myUploads'); g.innerHTML='';
+  const snap=await db.collection('uploads').where('userId','==',u.uid).orderBy('uploadedAt','desc').get();
+  snap.forEach(doc=>{ const x=doc.data();
+    g.insertAdjacentHTML('beforeend',`
+      <div class="tile">
+        <div class="thumb">${x.fileType.startsWith('video/')?'Video':'Image'}</div>
+        <div class="meta">
+          <div><b>${x.title||'Untitled'}</b> ${x.visibility==='private'?'<span class="badge warn">Private</span>':'<span class="badge ok">Public</span>'}</div>
+          <div class="row" style="margin-top:6px">
+            ${x.visibility==='private'?`<div class="pill">Price: $${Number(x.priceUSD||1.99).toFixed(2)}</div>`:''}
+            <button class="btn" onclick="openPlayer('${x.fileUrl}','${x.fileType||''}','${doc.id}')">Open</button>
+          </div>
+        </div>
+      </div>`); });
+}
+async function loadEarnings(u){
+  // 'ad_share' earnings only exist once an admin has run a real revenue
+  // distribution (see distributeAdRevenue) — so this number is always
+  // money the platform actually received, never a promise.
+  const up=await db.collection('earnings').where('userId','==',u.uid).where('type','==','ad_share').get(); let upLKR=0; up.forEach(d=>upLKR+=Number(d.data().amount||0));
+  const ref=await db.collection('earnings').where('userId','==',u.uid).where('type','==','referral').where('status','==','confirmed').get(); let refLKR=0; ref.forEach(d=>refLKR+=Number(d.data().amount||0));
+  const sales=await db.collection('earnings').where('userId','==',u.uid).where('type','==','private_sale').get(); let salesUSD=0; sales.forEach(d=>salesUSD+=Number(d.data().amount||0));
+  $('#eUp').textContent=upLKR; $('#eRef').textContent=refLKR; $('#eSales').textContent=salesUSD.toFixed(2); $('#eTotal').textContent=`Rs.${upLKR+refLKR} + $${salesUSD.toFixed(2)}`;
+  const rc=await db.collection('referrals').where('referrerId','==',u.uid).get();
+  const pend=await db.collection('referrals').where('referrerId','==',u.uid).where('status','==','pending').get();
+  $('#refCount').textContent=`${rc.size} (${pend.size} pending admin review)`; $('#refEarn').textContent=refLKR;
+}
+
+/* ===== Withdraw ===== */
+$('#wMethod').onchange=()=>{ const c=$('#wMethod').value==='oxapay'; $('#wPaypalField').classList.toggle('hide',c); $('#wCryptoField').classList.toggle('hide',!c); };
+$('#doWithdraw').onclick=async()=>{
+  const u=auth.currentUser; if(!u){toast('Login first');return;}
+  const method=$('#wMethod').value, amt=Number($('#wAmount').value||0);
+  const dest = method==='oxapay' ? $('#wWallet').value.trim() : $('#wEmail').value.trim();
+  if(!dest||!amt||amt<=0){toast('Enter valid details');return;}
+  await db.collection('withdrawals').add({userId:u.uid,method,destination:dest,amountUSD:amt,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  toast('Withdraw request submitted'); loadWithdraws(u);
+};
+async function loadWithdraws(u){ const box=$('#wList'); if(!u){box.innerHTML='';return;} const snap=await db.collection('withdrawals').where('userId','==',u.uid).orderBy('createdAt','desc').get(); box.innerHTML = snap.size? '' : '<p class="muted">No requests yet.</p>'; snap.forEach(d=>{ const x=d.data(); box.insertAdjacentHTML('beforeend',`<div class="pill">#${d.id.slice(-6)} — $${x.amountUSD} via ${x.method||'paypal'} → ${x.destination||x.paypalEmail||''} <b>[${x.status}]</b></div>`); }); }
+
+/* ===== Video player with MID-ROLL ad overlay ===== */
+const playerModal=$('#playerModal'), player=$('#player'), midAd=$('#midAd'), kadamMid=$('#kadamMid');
+let adShownOnce=false, adInterval=null, currentUploadId=null;
+function openPlayer(url,type,uploadId){
+  player.src=url; playerModal.style.display='flex'; adShownOnce=false; currentUploadId=uploadId||null;
+  clearInterval(adInterval); midAd.style.display='none';
+  player.play().catch(()=>{});
+  player.ontimeupdate=()=>{ if(!adShownOnce && player.currentTime>30){showMidAd(); adShownOnce=true;} };
+  adInterval=setInterval(()=>{ if(player.currentTime>60 && Math.floor(player.currentTime)%60===0){ showMidAd(); } },1000);
+}
+function showMidAd(){
+  player.pause(); midAd.style.display='flex'; kadamMid.innerHTML='';
+  // Rotate between whichever ad networks are configured
+  const networks=[];
+  if(KADAM_ZONE_ID && KADAM_ZONE_ID!=="YOUR_ZONE_ID") networks.push({src:"https://jsc.adskeeper.co.uk/k/a/kadam.net."+KADAM_ZONE_ID+".js"});
+  if(RICHADS_ZONE_ID && RICHADS_ZONE_ID!=="YOUR_RICHADS_ZONE_ID") networks.push({src:"https://richads.example/tag.js", zone:RICHADS_ZONE_ID});
+  if(HILLTOP_ZONE_ID && HILLTOP_ZONE_ID!=="YOUR_HILLTOP_ZONE_ID") networks.push({src:"https://hilltopads.example/tag.js", zone:HILLTOP_ZONE_ID});
+  if(networks.length){
+    const pick=networks[Math.floor(Math.random()*networks.length)];
+    const s=document.createElement('script'); s.async=true; s.src=pick.src; if(pick.zone) s.dataset.zone=pick.zone;
+    kadamMid.appendChild(s);
+    // This only counts that an ad *slot* was shown to this viewer — it is not
+    // proof of real ad revenue. Admin enters the actual revenue figure from
+    // each network's dashboard in /admin.html and payouts are calculated from that.
+    logAdView(currentUploadId);
+  } else {
+    kadamMid.innerHTML='<div style="padding:20px;border:1px dashed #fff;border-radius:8px">Add an ad network ZONE_ID to show a live ad.</div>';
+  }
+  setTimeout(closeAd,8000);
+}
+function closeAd(){ midAd.style.display='none'; player.play().catch(()=>{}); }
+$('#closeAd').onclick=closeAd;
+$('#closePlayer').onclick=()=>{ player.pause(); player.src=''; playerModal.style.display='none'; clearInterval(adInterval); };
+
+/* expose to buttons */
+window.openPlayer=openPlayer; window.viewPrivate=viewPrivate;
+
+/* Referral capture (if user arrives later without login screen) */
+const incomingRef = new URLSearchParams(location.search).get('ref');
+if(incomingRef){ localStorage.setItem('incoming_ref', incomingRef); }
+
+/* Public triggers */
+$('#openLogin').onclick=()=>$('#loginScreen').style.display='block';
+</script>
+</body>
+</html>

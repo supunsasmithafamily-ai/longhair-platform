@@ -1,0 +1,12 @@
+{
+  "name": "longhair-functions",
+  "description": "Backend for the Long Hair Earn platform: PayPal capture, ad-revenue distribution, referral/withdrawal admin actions.",
+  "engines": { "node": "20" },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.1.0",
+    "firebase-functions": "^5.0.0",
+    "node-fetch": "^2.7.0"
+  },
+  "private": true
+}

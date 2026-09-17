@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Long Hair Earn — Admin</title>
+<style>
+  body{font-family:system-ui,sans-serif;background:#0f1115;color:#eee;margin:0;padding:20px}
+  .card{background:#171a21;border:1px solid #2a2e38;border-radius:10px;padding:16px;margin-bottom:16px;max-width:900px}
+  .title{font-weight:700;font-size:18px;margin-bottom:10px}
+  input,select{background:#0f1115;border:1px solid #2a2e38;color:#eee;padding:8px;border-radius:6px;margin:4px 0;width:100%;box-sizing:border-box}
+  label{font-size:13px;color:#9aa0aa}
+  .field{margin-bottom:10px;max-width:320px}
+  button{background:#5b8def;color:#fff;border:0;padding:9px 14px;border-radius:6px;cursor:pointer;margin-top:6px}
+  button.danger{background:#e15b5b}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .item{border-bottom:1px solid #2a2e38;padding:10px 0}
+  .muted{color:#9aa0aa;font-size:13px}
+  .hide{display:none}
+</style>
+</head>
+<body>
+
+<div id="loginCard" class="card">
+  <div class="title">Admin Login</div>
+  <div class="field"><label>Email</label><input id="aEmail"></div>
+  <div class="field"><label>Password</label><input id="aPass" type="password"></div>
+  <button id="doLogin">Login</button>
+  <div id="loginMsg" class="muted"></div>
+</div>
+
+<div id="dash" class="hide">
+  <div class="row" style="justify-content:space-between;max-width:900px">
+    <div class="muted">Logged in as <b id="whoAmI"></b></div>
+    <button id="logout">Logout</button>
+  </div>
+
+  <div class="card">
+    <div class="title">Distribute Ad Revenue (real money, this period)</div>
+    <p class="muted">RichAds / HilltopAds / Kadam dashboard එකෙන් real revenue එක බලලා මෙතන දාන්න. මේකෙන් users ලට ගෙවන්නේ මේ අගය විතරයි — adViews count එකට අනුව proportionally බෙදෙනවා.</p>
+    <div class="field"><label>Period label (e.g. 2026-09-week3)</label><input id="periodLabel"></div>
+    <div class="field"><label>Total revenue received (USD)</label><input id="totalRevenue" type="number" step="0.01"></div>
+    <button id="doDistribute">Distribute</button>
+    <div id="distMsg" class="muted"></div>
+  </div>
+
+  <div class="card">
+    <div class="title">Pending Referrals</div>
+    <div id="referralList"><p class="muted">Loading…</p></div>
+  </div>
+
+  <div class="card">
+    <div class="title">Pending Withdrawals</div>
+    <div id="withdrawList"><p class="muted">Loading…</p></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-functions-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCh6TdiUNk1fwbZhqUyUPhES9cA0Xe1Avg",
+  authDomain: "studio-2796008461-e6419.firebaseapp.com",
+  projectId: "studio-2796008461-e6419",
+  storageBucket: "studio-2796008461-e6419.firebasestorage.app",
+  messagingSenderId: "861128696739",
+  appId: "1:861128696739:web:7d1369092fa27348c17016"
+};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth(), db=firebase.firestore(), functions=firebase.functions();
+const $=q=>document.querySelector(q);
+
+$('#doLogin').onclick=async()=>{
+  $('#loginMsg').textContent='';
+  try{
+    await auth.signInWithEmailAndPassword($('#aEmail').value.trim(), $('#aPass').value);
+  }catch(e){ $('#loginMsg').textContent=e.message; }
+};
+$('#logout').onclick=()=>auth.signOut();
+
+auth.onAuthStateChanged(async (u)=>{
+  if(!u){ $('#loginCard').classList.remove('hide'); $('#dash').classList.add('hide'); return; }
+  const token=await u.getIdTokenResult(true);
+  if(token.claims.admin!==true){
+    $('#loginMsg').textContent='This account does not have admin access. See scripts/set-admin.js in the README.';
+    await auth.signOut();
+    return;
+  }
+  $('#loginCard').classList.add('hide'); $('#dash').classList.remove('hide'); $('#whoAmI').textContent=u.email;
+  loadReferrals(); loadWithdrawals();
+});
+
+$('#doDistribute').onclick=async()=>{
+  const periodLabel=$('#periodLabel').value.trim(), totalRevenueUSD=Number($('#totalRevenue').value||0);
+  if(!periodLabel||!(totalRevenueUSD>0)){ $('#distMsg').textContent='Enter a period label and a positive revenue amount.'; return; }
+  $('#distMsg').textContent='Distributing…';
+  try{
+    const res=await functions.httpsCallable('distributeAdRevenue')({periodLabel, totalRevenueUSD});
+    $('#distMsg').textContent=`Done — paid ${res.data.creatorsPaid} creators across ${res.data.totalViews} logged ad views.`;
+    $('#periodLabel').value=''; $('#totalRevenue').value='';
+  }catch(e){ $('#distMsg').textContent='Error: '+e.message; }
+};
+
+async function loadReferrals(){
+  const box=$('#referralList');
+  const snap=await db.collection('referrals').where('status','==','pending').orderBy('joinedAt','desc').limit(50).get();
+  if(snap.empty){ box.innerHTML='<p class="muted">No pending referrals.</p>'; return; }
+  box.innerHTML='';
+  for(const d of snap.docs){
+    const x=d.data();
+    box.insertAdjacentHTML('beforeend', `
+      <div class="item" id="ref-${d.id}">
+        <div>Referrer: <code>${x.referrerId}</code> → New user: <code>${x.referredUserId}</code> — Rs.${x.bonusAmount}</div>
+        <div class="row">
+          <button onclick="approveRef('${d.id}')">Approve</button>
+          <button class="danger" onclick="rejectRef('${d.id}')">Reject</button>
+        </div>
+      </div>`);
+  }
+}
+window.approveRef=async(id)=>{ await functions.httpsCallable('approveReferral')({referralId:id}); document.getElementById('ref-'+id).remove(); };
+window.rejectRef=async(id)=>{ const reason=prompt('Reason (optional):')||''; await functions.httpsCallable('rejectReferral')({referralId:id, reason}); document.getElementById('ref-'+id).remove(); };
+
+async function loadWithdrawals(){
+  const box=$('#withdrawList');
+  const snap=await db.collection('withdrawals').where('status','==','pending').orderBy('createdAt','desc').limit(50).get();
+  if(snap.empty){ box.innerHTML='<p class="muted">No pending withdrawals.</p>'; return; }
+  box.innerHTML='';
+  for(const d of snap.docs){
+    const x=d.data();
+    box.insertAdjacentHTML('beforeend', `
+      <div class="item" id="wd-${d.id}">
+        <div>User: <code>${x.userId}</code> — $${x.amountUSD} via ${x.method||'paypal'} → ${x.destination||x.paypalEmail||''}</div>
+        <div class="muted">Send the money yourself via PayPal/oxapay OUTSIDE this app first, then click Mark Paid.</div>
+        <div class="row">
+          <button onclick="markPaid('${d.id}')">Mark Paid</button>
+          <button class="danger" onclick="rejectWd('${d.id}')">Reject</button>
+        </div>
+      </div>`);
+  }
+}
+window.markPaid=async(id)=>{ await functions.httpsCallable('markWithdrawalPaid')({withdrawalId:id}); document.getElementById('wd-'+id).remove(); };
+window.rejectWd=async(id)=>{ const reason=prompt('Reason (optional):')||''; await functions.httpsCallable('rejectWithdrawal')({withdrawalId:id, reason}); document.getElementById('wd-'+id).remove(); };
+</script>
+</body>
+</html>
